@@ -26,13 +26,10 @@ export async function translateText({
 
   const body: any = {
     q: text,
+    source: sourceLang, // Always include source, even if "auto"
     target: targetLang,
     format: "text",
   };
-
-  if (sourceLang !== "auto") {
-    body.source = sourceLang;
-  }
 
   if (API_KEY) {
     body.api_key = API_KEY;
@@ -48,6 +45,7 @@ export async function translateText({
 
   if (!response.ok) {
     const error = await response.text();
+    console.error("LibreTranslate API error:", error);
     throw new Error(`LibreTranslate API error: ${error}`);
   }
 
