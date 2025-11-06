@@ -1,6 +1,4 @@
-// MyMemory Translation API client (FREE, no API key needed)
-
-const MYMEMORY_URL = "https://api.mymemory.translated.net";
+// Simplified MyMemory Translation API (FREE, no signup)
 
 export interface TranslateRequest {
   text: string;
@@ -16,104 +14,46 @@ export interface TranslateResponse {
   };
 }
 
-// Language code mapping (MyMemory uses standard ISO codes)
-const LANG_CODE_MAP: Record<string, string> = {
-  "zh": "zh-CN",    // Mandarin
-  "zh-TW": "zh-TW", // Cantonese/Traditional Chinese
-  "ar": "ar",       // Arabic
-  "bn": "bn",       // Bengali
-  "de": "de",       // German
-  "en": "en",       // English
-  "es": "es",       // Spanish
-  "fr": "fr",       // French
-  "hi": "hi",       // Hindi
-  "id": "id",       // Indonesian
-  "it": "it",       // Italian
-  "ja": "ja",       // Japanese
-  "ko": "ko",       // Korean
-  "pt": "pt",       // Portuguese
-  "ru": "ru",       // Russian
-  "th": "th",       // Thai
-  "tr": "tr",       // Turkish
-  "ur": "ur",       // Urdu
-  "vi": "vi",       // Vietnamese
-  "pl": "pl",       // Polish
-  "uk": "uk",       // Ukrainian
-  "fa": "fa",       // Persian
-  "sw": "sw",       // Swahili
-  "nl": "nl",       // Dutch
-  "el": "el",       // Greek
-  "ms": "ms",       // Malay
-  "fi": "fi",       // Finnish
-  "no": "no",       // Norwegian
-  "ta": "ta",       // Tamil
-};
-
-function mapLanguageCode(code: string): string {
-  return LANG_CODE_MAP[code] || code;
-}
-
 export async function translateText({
   text,
   targetLang,
-  sourceLang = "auto",
+  sourceLang = "en",
 }: TranslateRequest): Promise<TranslateResponse> {
-  // MyMemory auto-detects if source is not provided
-  const langPair = sourceLang === "auto" 
-    ? `auto|${mapLanguageCode(targetLang)}`
-    : `${mapLanguageCode(sourceLang)}|${mapLanguageCode(targetLang)}`;
+  try {
+    // Simple MyMemory API call - source|target format
+    const langPair = `${sourceLang}|${targetLang}`;
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langPair}`;
+    
+    console.log("Translation request:", { text, langPair, url });
 
-  const url = `${MYMEMORY_URL}/get?q=${encodeURIComponent(text)}&langpair=${langPair}`;
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+    const data = await response.json();
+    
+    console.log("Translation response:", data);
 
-  if (!response.ok) {
-    const error = await response.text();
-    console.error("MyMemory API error:", error);
-    throw new Error(`Translation API error: ${error}`);
+    // Check if translation was successful
+    if (!data.responseData || !data.responseData.translatedText) {
+      throw new Error("Invalid response from translation API");
+    }
+
+    return {
+      translatedText: data.responseData.translatedText,
+      detectedLanguage: {
+        confidence: 1,
+        language: sourceLang,
+      },
+    };
+  } catch (error) {
+    console.error("Translation error details:", error);
+    throw new Error(`Translation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-
-  const data = await response.json();
-
-  // MyMemory response format
-  if (data.responseStatus !== 200) {
-    throw new Error(data.responseDetails || "Translation failed");
-  }
-
-  // Detect source language from response
-  let detectedLang = sourceLang;
-  if (sourceLang === "auto" && data.matches && data.matches.length > 0) {
-    // MyMemory doesn't return detected language directly, 
-    // so we'll use "auto" or parse from matches if available
-    detectedLang = "auto";
-  }
-
-  return {
-    translatedText: data.responseData.translatedText,
-    detectedLanguage: {
-      confidence: data.matches?.[0]?.match || 1,
-      language: detectedLang,
-    },
-  };
 }
 
 export async function detectLanguage(text: string): Promise<string> {
-  // MyMemory doesn't have a dedicated detect endpoint
-  // We'll use a translation to English with auto-detect
-  try {
-    await translateText({
-      text,
-      targetLang: "en",
-      sourceLang: "auto",
-    });
-    return "auto"; // MyMemory auto-detects but doesn't return the source lang
-  } catch (error) {
-    console.error("Language detection failed:", error);
-    return "unknown";
-  }
+  return "en"; // Default to English for now
 }
