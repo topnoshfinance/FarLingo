@@ -1,94 +1,39 @@
-// LibreTranslate API client
+import axios from 'axios';
 
-const LIBRETRANSLATE_URL = process.env.LIBRETRANSLATE_URL || "https://libretranslate.com";
-const API_KEY = process.env.LIBRETRANSLATE_API_KEY || "";
+const LANGUAGE_MAP = {
+    'en': 'en-US',
+    'es': 'es-ES',
+    'fr': 'fr-FR',
+    // Add more language mappings as needed
+};
 
-export interface TranslateRequest {
-  text: string;
-  targetLang: string;
-  sourceLang?: string; // auto-detect if not provided
+async function translate(text, targetLang) {
+    const langCode = LANGUAGE_MAP[targetLang] || targetLang;
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|${langCode}`;
+
+    try {
+        const response = await axios.get(url);
+        if (response.data && response.data.responseData) {
+            return response.data.responseData.translatedText;
+        } else {
+            throw new Error('Translation response is not valid.');
+        }
+    } catch (error) {
+        console.error('Error during translation:', error);
+        throw new Error('Translation failed. Please try again later.');
+    }
 }
 
-export interface TranslateResponse {
-  translatedText: string;
-  detectedLanguage: {
-    confidence: number;
-    language: string;
-  };
+async function detectLanguage(text) {
+    const url = `https://api.mymemory.translated.net/detect?q=${encodeURIComponent(text)}`;
+
+    try {
+        const response = await axios.get(url);
+        return response.data && response.data.result && response.data.result.language;
+    } catch (error) {
+        console.error('Error during language detection:', error);
+        throw new Error('Language detection failed. Please try again later.');
+    }
 }
 
-export async function translateText({
-  text,
-  targetLang,
-  sourceLang = "auto",
-}: TranslateRequest): Promise<TranslateResponse> {
-  const url = `${LIBRETRANSLATE_URL}/translate`;
-
-  const body: any = {
-    q: text,
-    source: sourceLang, // Always include source, even if "auto"
-    target: targetLang,
-    format: "text",
-  };
-
-  if (API_KEY) {
-    body.api_key = API_KEY;
-  }
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error("LibreTranslate API error:", error);
-    throw new Error(`LibreTranslate API error: ${error}`);
-  }
-
-  const data = await response.json();
-
-  return {
-    translatedText: data.translatedText,
-    detectedLanguage: data.detectedLanguage || {
-      confidence: 0,
-      language: sourceLang === "auto" ? "unknown" : sourceLang,
-    },
-  };
-}
-
-export async function detectLanguage(text: string): Promise<string> {
-  const url = `${LIBRETRANSLATE_URL}/detect`;
-
-  const body: any = {
-    q: text,
-  };
-
-  if (API_KEY) {
-    body.api_key = API_KEY;
-  }
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    throw new Error("Language detection failed");
-  }
-
-  const data = await response.json();
-
-  // LibreTranslate returns an array of detections, take the most confident
-  if (data && data.length > 0) {
-    return data[0].language;
-  }
-
-  return "unknown";
-}
+export { translate, detectLanguage };
